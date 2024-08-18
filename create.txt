@@ -1,0 +1,2 @@
+Sistem Rekomendasi ini menggunakan metode Content-based filtering,
+yang dapat menyarankan item serupa dengan item yang sebelumnya disukai pengguna
