@@ -1,0 +1,89 @@
+#import library
+import pandas as pd
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+
+#import dataset
+df = pd.read_csv('cosmetics.csv')
+print(df.head())
+
+#Mengecek null
+print(df.isna().sum())
+
+#melihat jumlah baris dan kolom dataset
+print(df.shape)
+
+# Pisahkan bahan-bahan menjadi kolom tersendiri
+ingredients = df['Ingredients'].str.split(',', expand=True)
+# Bersihkan data bahan
+ingredients = ingredients.apply(lambda x: x.str.strip().str.lower() if x.dtype == "object" else x)
+# Tampilkan beberapa baris pertama dari data bahan
+print(ingredients.head())
+
+# Gabungkan semua bahan menjadi satu teks per produk
+ingredient_text = ingredients.apply(lambda x: ','.join(x.dropna()), axis=1)
+# Buat matriks fitur dari bahan-bahan
+vectorizer = CountVectorizer(tokenizer=lambda x: x.split(','))
+ingredients_matrix = vectorizer.fit_transform(ingredient_text)
+# Tampilkan matriks fitur
+print(ingredients_matrix.toarray())
+
+# Hitung kemiripan kosinus antar produk berdasarkan bahan-bahan
+ingredient_similarity = cosine_similarity(ingredients_matrix)
+# Tampilkan matriks korelasi
+print(ingredient_similarity)
+
+# Fungsi untuk mendapatkan produk serupa berdasarkan bahan-bahan
+def get_similar_products_based_on_ingredients(product_names, num_recommendations=5):
+    similar_products_list = []
+    for product_name in product_names:
+        # Dapatkan indeks produk berdasarkan nama produk
+        product_index = df[df['Name'] == product_name].index[0]
+        # Dapatkan nilai kemiripan untuk produk tertentu
+        similar_scores = list(enumerate(ingredient_similarity[product_index]))
+        # Urutkan produk berdasarkan nilai kemiripan
+        similar_scores = sorted(similar_scores, key=lambda x: x[1], reverse=True)
+        # Ambil indeks produk yang paling mirip (kecuali produk itu sendiri)
+        similar_indices = [i for i, _ in similar_scores[1:num_recommendations+1]]
+        # Ambil nama produk yang paling mirip
+        similar_products = df['Name'].iloc[similar_indices].tolist()
+        similar_products_list.append((product_name, similar_products))
+    return similar_products_list
+# Contoh pemanggilan fungsi dengan beberapa produk
+sample_products = ["The Silk Cream", "U.F.O. Ultra-Clarifying Face Oil"]
+similar_products = get_similar_products_based_on_ingredients(sample_products, num_recommendations=5)
+# Cetak hasil rekomendasi
+for product, recommendations in similar_products:
+    print("Similar products for", product, ":")
+    for recommendation in recommendations:
+        print(" -", recommendation)
+    print() 
+
+#Metode evaluasi yang digunakan dalam contoh di atas adalah Precision@k, dimana k adalah jumlah teratas dari rekomendasi yang dipertimbangkan
+def precision_at_k(recommended_products, relevant_products, k):
+    recommended_k = recommended_products[:k]
+    relevant_set = set(relevant_products)
+    recommended_set = set(recommended_k)
+    relevant_and_recommended = recommended_set.intersection(relevant_set)
+    precision = len(relevant_and_recommended) / k
+    return precision
+def evaluate_recommendation_system(sample_products, num_recommendations=6):
+    # Dapatkan hasil rekomendasi
+    similar_products = get_similar_products_based_on_ingredients(sample_products, num_recommendations)
+    
+    # Bangun data evaluasi otomatis
+    evaluation_data = {product: recommendations for product, recommendations in similar_products}
+    
+    total_precision = 0
+    for product, relevant_products in evaluation_data.items():
+        recommended_products = relevant_products  # recommended_products already obtained in evaluation_data
+        precision = precision_at_k(recommended_products, relevant_products, num_recommendations)
+        total_precision += precision
+        print(f"Precision dari {product}: {precision:.2f}")
+    average_precision = total_precision / len(evaluation_data)
+    print(f"Average Precision dari: {average_precision:.2f}")
+# Evaluasi sistem rekomendasi
+evaluate_recommendation_system(sample_products, num_recommendations=6)
+
+
+
